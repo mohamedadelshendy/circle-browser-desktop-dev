@@ -1,0 +1,57 @@
+{
+  "name": "Circle browser",
+  "vendor": "Circle OSS Team",
+  "appId": "circle",
+  "binaryName": "circle",
+  "version": {
+    "product": "firefox",
+    "version": "153.0.4",
+    "candidate": "154.0",
+    "candidateBuild": 1
+  },
+  "buildOptions": {
+    "generateBranding": true
+  },
+  "addons": {},
+  "brands": {
+    "release": {
+      "backgroundColor": "#282A33",
+      "brandShorterName": "Circle",
+      "brandShortName": "Circle",
+      "brandFullName": "Circle browser",
+      "release": {
+        "displayVersion": "1.21.14b",
+        "github": {
+          "repo": "circle-browser/desktop"
+        },
+        "archives": {
+          "windows": "windows.mar",
+          "macos-aarch64": "macos-aarch64.mar",
+          "linux": "linux.mar",
+          "macos-x64": "macos-x64.mar",
+          "windows-arm64": "windows-arm64.mar",
+          "linux-aarch64": "linux-aarch64.mar"
+        }
+      }
+    },
+    "twilight": {
+      "backgroundColor": "#282A33",
+      "brandShorterName": "Circle",
+      "brandShortName": "Twilight",
+      "brandFullName": "Circle Twilight",
+      "release": {
+        "displayVersion": "1.22t",
+        "github": {
+          "repo": "circle-browser/desktop"
+        }
+      }
+    }
+  },
+  "license": {
+    "ignoredFiles": [
+      ".*\\.json"
+    ],
+    "licenseType": "MPL-2.0"
+  },
+  "updateHostname": "updates.circle-browser.app"
+}
