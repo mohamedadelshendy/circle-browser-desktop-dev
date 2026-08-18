@@ -270,6 +270,22 @@ jobs:
       - name: Download Firefox source and dependencies
         run: npm run download --verbose
 
+      - name: Validate patches apply cleanly
+        run: |
+          echo "=== Validating patches against engine source ==="
+          FAIL=0
+          for patch in src/**/*.patch; do
+            if ! git -C engine apply --check --ignore-space-change --ignore-whitespace "$GITHUB_WORKSPACE/$patch" 2>/dev/null; then
+              echo "❌ FAIL: $patch"
+              FAIL=1
+            fi
+          done
+          if [ "$FAIL" -eq 1 ]; then
+            echo "::error::Some patches do not apply cleanly. Run 'surfer export' locally to regenerate."
+            exit 1
+          fi
+          echo "✅ All patches validated"
+
       - name: Import
         run: npm run import -- --verbose
 
