@@ -157,9 +157,7 @@ jobs:
           cd ../..
 
       - name: create .p12 for codesign 🖊️
-        if: ${{ env.HAVE_APP_CERT == 'true' }}
-        env:
-          HAVE_APP_CERT: ${{ secrets.macOS_CERTIFICATES_P12_For_App_BASE64 != '' }}
+        if: ${{ secrets.macOS_CERTIFICATES_P12_For_App_BASE64 != '' }}
         run: |
           cd engine
           echo "${{ secrets.macOS_CERTIFICATES_P12_For_App_BASE64 }}" > cert.txt
@@ -167,16 +165,12 @@ jobs:
           echo "${{ secrets.macOS_CERTIFICATES_P12_PASSWORD }}" > zenpCertPassword.passwd
 
       - name: Remove certificate sensitive information
-        if: ${{ env.HAVE_APP_CERT == 'true' }}
-        env:
-          HAVE_APP_CERT: ${{ secrets.macOS_CERTIFICATES_P12_For_App_BASE64 != '' }}
+        if: ${{ secrets.macOS_CERTIFICATES_P12_For_App_BASE64 != '' }}
         run: |
           rm -f engine/cert.txt || true
 
       - name: Import provisioning profile for .app
-        if: ${{ env.HAVE_PROV == 'true' }}
-        env:
-          HAVE_PROV: ${{ secrets.macOS_PROVISIONING_PROFILE != '' }}
+        if: ${{ secrets.macOS_PROVISIONING_PROFILE != '' }}
         run: |
           echo "${{ secrets.macOS_PROVISIONING_PROFILE }}" | base64 --decode > ./engine/Zen_Browser.provisionprofile
           ls -la
@@ -188,18 +182,14 @@ jobs:
           echo "Merged aarch64 into x86_64!"
 
       - name: Import APPLE DEVELOPER ID CERTIFICATE for .app
-        if: ${{ env.HAVE_APP_CERT == 'true' }}
-        env:
-          HAVE_APP_CERT: ${{ secrets.macOS_CERTIFICATES_P12_For_App_BASE64 != '' }}
+        if: ${{ secrets.macOS_CERTIFICATES_P12_For_App_BASE64 != '' }}
         uses: Apple-Actions/import-codesign-certs@v3
         with:
           p12-file-base64: ${{ secrets.macOS_CERTIFICATES_P12_For_App_BASE64 }}
           p12-password: ${{ secrets.macOS_CERTIFICATES_P12_PASSWORD }}
 
       - name: Copy provisioning profile for .app (embedded in .app)
-        if: ${{ env.HAVE_PROV == 'true' }}
-        env:
-          HAVE_PROV: ${{ secrets.macOS_PROVISIONING_PROFILE != '' }}
+        if: ${{ secrets.macOS_PROVISIONING_PROFILE != '' }}
         run: |
           cd engine
           echo "Copying provisioning profile for .app on both architectures (${{ env.APP_NAME }})"
