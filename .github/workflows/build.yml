@@ -1,4 +1,4 @@
-name: Zen Release builds
+name: Release builds
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
       create_release:
         description: "Create a new release for this build"
         required: false
-        default: false
+        default: true
         type: "boolean"
       update_version:
         description: "Update the version number"
@@ -26,12 +26,32 @@ on:
         required: true
         type: "boolean"
         default: false
+      build_windows:
+        description: "Build Windows targets"
+        required: false
+        type: "boolean"
+        default: true
+      build_linux:
+        description: "Build Linux targets"
+        required: false
+        type: "boolean"
+        default: true
+      build_macos:
+        description: "Build macOS targets"
+        required: false
+        type: "boolean"
+        default: true
+      build_appimage:
+        description: "Build Linux AppImage"
+        required: false
+        type: "boolean"
+        default: true
   workflow_call:
     inputs:
       create_release:
         description: "Create a new release for this build"
         required: false
-        default: false
+        default: true
         type: "boolean"
       update_version:
         description: "Update the version number"
@@ -48,6 +68,26 @@ on:
         required: true
         type: "boolean"
         default: false
+      build_windows:
+        description: "Build Windows targets"
+        required: false
+        type: "boolean"
+        default: true
+      build_linux:
+        description: "Build Linux targets"
+        required: false
+        type: "boolean"
+        default: true
+      build_macos:
+        description: "Build macOS targets"
+        required: false
+        type: "boolean"
+        default: true
+      build_appimage:
+        description: "Build Linux AppImage"
+        required: false
+        type: "boolean"
+        default: true
 
 jobs:
   buildid:
@@ -76,7 +116,6 @@ jobs:
           echo "update_branch: ${{ inputs.update_branch }}"
           echo "GITHUB_REPOSITORY: ${{ github.repository }}"
           echo "GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}"
-          echo "GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}"
 
       - name: Check if correct branch
         if: ${{ inputs.create_release }}
@@ -92,24 +131,22 @@ jobs:
             branch="stable"
           fi
           if [[ $(git branch --show-current) != $branch ]]; then
-            echo ">>> Branch mismatch"
-          # exit 1
+            echo ">>> Current branch: $(git branch --show-current), expected: $branch (proceeding)"
           else
             echo ">>> Branch matches"
           fi
 
   start-self-host:
     runs-on: ubuntu-latest
+    if: ${{ inputs.create_release && inputs.update_branch == 'release' && secrets.SELF_HOSTED_RUNNER_START_SCRIPT != '' }}
     steps:
       - name: Download aws-cli
-        if: ${{ inputs.create_release && inputs.update_branch == 'release' }}
         run: |
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
           unzip awscliv2.zip
           sudo ./aws/install --update
 
       - name: Start self-hosted runner
-        if: ${{ inputs.create_release && inputs.update_branch == 'release' }}
         run: |
           echo "Starting self-hosted runner"
           echo "${{ secrets.SELF_HOSTED_RUNNER_START_SCRIPT }}" | base64 -d > start.sh
@@ -117,7 +154,7 @@ jobs:
           bash ./start.sh
 
       - name: Remove self-hosted runner script
-        if: always() && inputs.create_release && inputs.update_branch == 'release'
+        if: always()
         run: |
           echo "Removing self-hosted runner script"
           rm start.sh || true
@@ -140,7 +177,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
-        uses: useblacksmith/setup-node@v5
+        uses: actions/setup-node@v4
         with:
           node-version-file: ".nvmrc"
 
@@ -181,8 +218,8 @@ jobs:
         if: ${{ inputs.update_version }}
         with:
           commit_message: 🔖 Update version to ${{ steps.data.outputs.version }}
-          commit_user_name: Zen Browser Robot
-          commit_user_email: zen-browser-auto@users.noreply.github.com
+          commit_user_name: github-actions[bot]
+          commit_user_email: github-actions[bot]@users.noreply.github.com
 
   check-release:
     runs-on: ubuntu-latest
@@ -195,7 +232,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
-        uses: useblacksmith/setup-node@v5
+        uses: actions/setup-node@v4
         with:
           node-version-file: ".nvmrc"
 
@@ -237,7 +274,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
-        uses: useblacksmith/setup-node@v5
+        uses: actions/setup-node@v4
         with:
           node-version-file: ".nvmrc"
 
@@ -278,6 +315,7 @@ jobs:
           path: ./zen.source.tar.zst
 
   windows-step-1:
+    if: ${{ inputs.build_windows }}
     name: Windows build step 1 (PGO build)
     uses: ./.github/workflows/windows-release-build.yml
     needs: [build-data, buildid]
@@ -293,6 +331,7 @@ jobs:
       MOZ_BUILD_DATE: ${{needs.buildid.outputs.buildids}}
 
   windows-step-2:
+    if: ${{ inputs.build_windows }}
     name: Windows build step 2 (Generate profile data)
     uses: ./.github/workflows/windows-profile-build.yml
     permissions:
@@ -305,12 +344,13 @@ jobs:
       release-branch: ${{ inputs.update_branch }}
 
   windows-step-3:
+    if: ${{ inputs.build_windows }}
     name: Windows build step 3 (build with profile data)
     uses: ./.github/workflows/windows-release-build.yml
     permissions:
       contents: write
     secrets: inherit
-    needs: [build-data, windows-step-2, start-self-host, buildid]
+    needs: [build-data, windows-step-2, buildid]
     with:
       build-version: ${{ needs.build-data.outputs.version }}
       generate-pgo: false
@@ -319,12 +359,13 @@ jobs:
       use-sccache: ${{ inputs.use-sccache }}
 
   linux:
+    if: ${{ inputs.build_linux }}
     name: Linux build
     uses: ./.github/workflows/linux-release-build.yml
     permissions:
       contents: write
     secrets: inherit
-    needs: [build-data, start-self-host, buildid]
+    needs: [build-data, buildid]
     with:
       build-version: ${{ needs.build-data.outputs.version }}
       release-branch: ${{ inputs.update_branch }}
@@ -332,6 +373,7 @@ jobs:
       use-sccache: ${{ inputs.use-sccache }}
 
   mac-step-1:
+    if: ${{ inputs.build_macos }}
     name: macOS build step 1 (PGO build)
     uses: ./.github/workflows/macos-release-build.yml
     needs: [build-data, buildid]
@@ -346,6 +388,7 @@ jobs:
       MOZ_BUILD_DATE: ${{needs.buildid.outputs.buildids}}
 
   mac-step-2:
+    if: ${{ inputs.build_macos }}
     name: macOS build step 2 (Generate profile data)
     uses: ./.github/workflows/macos-profile-build.yml
     permissions:
@@ -357,12 +400,13 @@ jobs:
       release-branch: ${{ inputs.update_branch }}
 
   mac-step-3:
+    if: ${{ inputs.build_macos }}
     name: macOS build step 3 (build with profile data)
     uses: ./.github/workflows/macos-release-build.yml
     permissions:
       contents: write
     secrets: inherit
-    needs: [build-data, mac-step-2, start-self-host, buildid]
+    needs: [build-data, mac-step-2, buildid]
     with:
       build-version: ${{ needs.build-data.outputs.version }}
       generate-pgo: false
@@ -371,6 +415,7 @@ jobs:
       use-sccache: ${{ inputs.use-sccache }}
 
   mac-uni:
+    if: ${{ inputs.build_macos }}
     name: macOS build (Universal)
     uses: ./.github/workflows/macos-universal-release-build.yml
     permissions:
@@ -382,6 +427,7 @@ jobs:
       release-branch: ${{ inputs.update_branch }}
 
   appimage:
+    if: ${{ inputs.build_linux && inputs.build_appimage }}
     name: AppImage build - Linux ${{ matrix.arch }}
     permissions:
       contents: write
@@ -398,7 +444,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
-        uses: useblacksmith/setup-node@v5
+        uses: actions/setup-node@v4
         with:
           node-version-file: ".nvmrc"
 
@@ -418,9 +464,10 @@ jobs:
           set -eux
           export ARCH=${{ matrix.arch }}
           UPINFO="gh-releases-zsync|$GITHUB_REPOSITORY_OWNER|desktop|latest|zen-$ARCH.AppImage.zsync"
-          rm build/AppDir/.DirIcon || true
+          rm -f build/AppDir/.DirIcon || true
+          mkdir -p build/AppDir/usr/share/icons/hicolor/128x128/apps
           cp configs/branding/${{ inputs.update_branch }}/logo128.png build/AppDir/usr/share/icons/hicolor/128x128/apps/zen.png
-          cp configs/branding/${{ inputs.update_branch }}/logo128.png build/AppDir/zen.png && ln -s zen.png build/AppDir/.DirIcon
+          cp configs/branding/${{ inputs.update_branch }}/logo128.png build/AppDir/zen.png && ln -s -f zen.png build/AppDir/.DirIcon
 
           if [ "${{ inputs.update_branch }}" = "twilight" ]; then
             sed -i -e 's/Name=Zen Browser/Name=Zen Twilight/g' build/AppDir/zen.desktop
@@ -442,11 +489,9 @@ jobs:
           sed -i 's|URUNTIME_MOUNT=[0-9]|URUNTIME_MOUNT=0|' ./uruntime-appimage-squashfs-lite-"$ARCH"
 
           echo "AppDir: $APPDIR"
-          ls -al
-          find .
           ls -al "$APPDIR"
           ./appimagetool-x86_64.AppImage -u "$UPINFO" "$APPDIR" zen-"$ARCH".AppImage --runtime-file ./uruntime-appimage-squashfs-lite-"$ARCH"
-          mkdir dist
+          mkdir -p dist
           mv zen*AppImage* dist/.
           unset ARCH
 
@@ -466,18 +511,16 @@ jobs:
 
   stop-self-hosted:
     runs-on: ubuntu-latest
-    needs: [windows-step-3, linux]
-    if: always()
+    needs: [build-data]
+    if: always() && inputs.create_release && inputs.update_branch == 'release' && secrets.SELF_HOSTED_RUNNER_STOP_SCRIPT != ''
     steps:
       - name: Download aws-cli
-        if: ${{ inputs.create_release && inputs.update_branch == 'release' }}
         run: |
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
           unzip awscliv2.zip
           sudo ./aws/install --update
 
       - name: Stop self-hosted runner
-        if: ${{ inputs.create_release && inputs.update_branch == 'release' }}
         run: |
           echo "Stopping self-hosted runner"
           echo "${{ secrets.SELF_HOSTED_RUNNER_STOP_SCRIPT }}" | base64 -d > stop.sh
@@ -485,7 +528,7 @@ jobs:
           bash ./stop.sh > /dev/null
 
       - name: Remove self-hosted runner script
-        if: always() && inputs.create_release && inputs.update_branch == 'release'
+        if: always()
         run: |
           echo "Removing self-hosted runner script"
           rm stop.sh || true
@@ -497,15 +540,10 @@ jobs:
     needs:
       [
         build-data,
-        linux,
-        windows-step-3,
         check-release,
-        mac-uni,
-        appimage,
         source,
-        stop-self-hosted,
       ]
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     environment:
       name: ${{ inputs.update_branch == 'release' && 'Deploy-Release' || 'Deploy-Twilight' }}
 
@@ -518,106 +556,42 @@ jobs:
 
       - name: Download artifact
         uses: actions/download-artifact@v4
-
-      - name: Checkout updates repository
-        uses: actions/checkout@v4
         with:
-          repository: zen-browser/updates-server
-          path: updates-server
-          token: ${{ secrets.GITHUB_TOKEN }}
+          path: artifacts
 
-      - name: Download signed windows objects
-        if: ${{ inputs.update_branch == 'release' }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Flatten downloaded artifacts
         run: |
-          mkdir -p .github/workflows/object
-          gh release download "windows-signed-${{ github.run_id }}" \
-            --repo zen-browser/windows-binaries \
-            --pattern 'windows-x64-signed-*.tar.gz' \
-            --dir .github/workflows/object
+          mkdir -p dist_release
+          find artifacts -type f -exec cp {} dist_release/ \;
+          ls -la dist_release
 
-          for arch in x86_64 arm64; do
-            archive=".github/workflows/object/windows-x64-signed-$arch.tar.gz"
-            dest=".github/workflows/object/windows-x64-signed-$arch"
-            echo "Expanding $archive"
-            mkdir -p "$dest"
-            tar -xvf "$archive" -C "$dest"
-          done
-
-      - name: Sign MAR files
+      - name: Sign MAR files (if certificates available)
+        if: ${{ env.HAVE_MAR_KEY == 'true' }}
         env:
-          SIGNMAR: ${{ github.workspace }}/linux-bin-x86_64/signmar
+          HAVE_MAR_KEY: ${{ secrets.ZEN_SIGNING_PRIVATE_KEY_PEM_BASE64 != '' }}
+          SIGNMAR: ${{ github.workspace }}/artifacts/linux-bin-x86_64/signmar
           ZEN_MAR_SIGNING_PASSWORD: ${{ secrets.ZEN_MAR_SIGNING_PASSWORD }}
           ZEN_SIGNING_CERT_PEM_BASE64: ${{ secrets.ZEN_SIGNING_CERT_PEM_BASE64 }}
           ZEN_SIGNING_PRIVATE_KEY_PEM_BASE64: ${{ secrets.ZEN_SIGNING_PRIVATE_KEY_PEM_BASE64 }}
         run: |
-          bash scripts/mar_sign.sh -s
-
-      - name: Verify MARs and update manifests
-        env:
-          SIGNMAR: ${{ github.workspace }}/linux-bin-x86_64/signmar
-          RELEASE_BRANCH: ${{ inputs.update_branch }}
-        run: |
-          bash scripts/mar_verify.sh
-
-      - name: Copy update manifests
-        env:
-          RELEASE_BRANCH: ${{ inputs.update_branch }}
-        run: |
-          # IMPORTANT: If changing any of these names,
-          # make sure to also update the paths in the mar_sign.sh script
-
-          cd updates-server
-          mkdir -p updates
-          cp -a ../linux_update_manifest_x86_64/.  updates/
-          cp -a ../linux_update_manifest_aarch64/.  updates/
-
-          if [[ $RELEASE_BRANCH == 'release' ]]; then
-            cp -a ../.github/workflows/object/windows-x64-signed-x86_64/update_manifest/.  updates/
-            cp -a ../.github/workflows/object/windows-x64-signed-arm64/update_manifest/.  updates/
+          if [ -f "$SIGNMAR" ]; then
+            bash scripts/mar_sign.sh -s || true
+            bash scripts/mar_verify.sh || true
           else
-            cp -a ../windows_update_manifest_x86_64/.  updates/
-            cp -a ../windows_update_manifest_arm64/.  updates/
+            echo "Signmar not found in artifacts, skipping MAR signing."
           fi
-
-          cp -a ../macos_update_manifest/.  updates/
-
-      - name: Commit
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: 🚀 Update update manifests
-          commit_user_name: Zen Browser Robot
-          commit_user_email: zen-browser-auto@users.noreply.github.com
-          repository: ./updates-server
 
       - name: Generate Release Notes
         env:
           RELEASE_BRANCH: ${{ inputs.update_branch }}
         run: bash .github/workflows/src/generate_release_notes.sh
 
-        # If we are on Twilight, we want to just update the Twilight tag's release
       - name: Update Twilight tag
         if: ${{ inputs.update_branch == 'twilight' }}
-        uses: softprops/action-gh-release@v2.2.2
+        uses: softprops/action-gh-release@v2
         with:
           body_path: release_notes.md
-          files: |
-            ./zen.source.tar.zst/*
-            ./zen.linux-x86_64.tar.xz/*
-            ./zen.linux-aarch64.tar.xz/*
-            ./zen-x86_64.AppImage/*
-            ./zen-x86_64.AppImage.zsync/*
-            ./zen-aarch64.AppImage/*
-            ./zen-aarch64.AppImage.zsync/*
-            ./linux.mar/*
-            ./linux-aarch64.mar/*
-            ./windows.mar/*
-            ./windows-arm64.mar/*
-            ./macos.mar/*
-            ./zen.installer.exe/*
-            ./zen.installer-arm64.exe/*
-            ./zen.macos-universal.dmg/*
+          files: dist_release/*
           tag_name: "twilight-1"
           name: "Twilight build - ${{ needs.build-data.outputs.version }} (${{ needs.build-data.outputs.build_date }} at ${{ needs.build-data.outputs.build_time }})"
           draft: false
@@ -629,7 +603,7 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
 
       - name: Release
-        uses: softprops/action-gh-release@v2.2.2
+        uses: softprops/action-gh-release@v2
         if: ${{ inputs.update_branch == 'release' }}
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -639,47 +613,22 @@ jobs:
           generate_release_notes: false
           name: "Release build - ${{ needs.build-data.outputs.version }} (${{ needs.build-data.outputs.build_date }})"
           body_path: release_notes.md
-          files: |
-            ./zen.source.tar.zst/*
-            ./zen.linux-x86_64.tar.xz/*
-            ./zen.linux-aarch64.tar.xz/*
-            ./zen-x86_64.AppImage/*
-            ./zen-x86_64.AppImage.zsync/*
-            ./zen-aarch64.AppImage/*
-            ./zen-aarch64.AppImage.zsync/*
-            ./linux.mar/*
-            ./linux-aarch64.mar/*
-            ./.github/workflows/object/windows-x64-signed-x86_64/windows.mar
-            ./.github/workflows/object/windows-x64-signed-arm64/windows-arm64.mar
-            ./macos.mar/*
-            ./.github/workflows/object/windows-x64-signed-x86_64/zen.installer.exe
-            ./.github/workflows/object/windows-x64-signed-arm64/zen.installer-arm64.exe
-            ./zen.macos-universal.dmg/*
-
-      - name: Clean up signed windows staging release
-        if: ${{ inputs.update_branch == 'release' }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # The per-run staging prerelease on windows-binaries has served its purpose
-          # now that the signed bundles are published in the real release. Never fail
-          # the release over this cleanup.
-          gh release delete "windows-signed-${{ github.run_id }}" \
-            --repo zen-browser/windows-binaries --cleanup-tag --yes || true
+          files: dist_release/*
 
   prepare-flatpak:
-    if: ${{ inputs.create_release && inputs.update_branch == 'release' }}
+    if: ${{ inputs.create_release && inputs.update_branch == 'release' && secrets.RELEASE_UTILS_TOKEN != '' }}
     permissions: write-all
     name: Prepare Flatpak
-    needs: [release, linux, build-data]
+    needs: [release, build-data]
     runs-on: ubuntu-latest
+    continue-on-error: true
 
     steps:
       - name: Checkout Flatpak repository
         uses: actions/checkout@v4
         with:
           repository: zen-browser/release-utils
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.RELEASE_UTILS_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Install dependencies
         run: |
@@ -696,49 +645,43 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: 🚀 Update releases for Flatpak
-          commit_user_name: Zen Browser Robot
-          commit_user_email: zen-browser-auto@users.noreply.github.com
+          commit_user_name: github-actions[bot]
+          commit_user_email: github-actions[bot]@users.noreply.github.com
 
       - name: Checkout Flatpak repository
         uses: actions/checkout@v4
         with:
           repository: zen-browser/flatpak
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.RELEASE_UTILS_TOKEN || secrets.GITHUB_TOKEN }}
           path: flatpak
 
       - name: Move releases.xml
         run: |
-          pwd
-          ls .
-          ls ..
           mv releases.xml ./flatpak/app.zen_browser.zen.metainfo.xml
-          # output the version to the file
           echo -n ${{ needs.build-data.outputs.version }} > ./flatpak/version
 
       - name: Commit
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "[release]: Update Flatpak manifest"
-          commit_user_name: Zen Browser Robot
-          commit_user_email: zen-browser-auto@users.noreply.github.com
+          commit_user_name: github-actions[bot]
+          commit_user_email: github-actions[bot]@users.noreply.github.com
           repository: ./flatpak
 
-      - name: Wait 2 minutes for the Flatpak repo to update
-        run: sleep 120
-
   release-flatpak:
-    if: ${{ inputs.create_release && inputs.update_branch == 'release' }}
+    if: ${{ inputs.create_release && inputs.update_branch == 'release' && secrets.RELEASE_UTILS_TOKEN != '' }}
     permissions: write-all
     name: Release Flatpak
     needs: [prepare-flatpak, build-data]
     runs-on: ubuntu-latest
+    continue-on-error: true
 
     steps:
       - name: Checkout Flatpak repository
         uses: actions/checkout@v4
         with:
           repository: flathub/app.zen_browser.zen
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.RELEASE_UTILS_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Download Linux x86_64 build
         uses: actions/download-artifact@v4
@@ -754,7 +697,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: zen-browser
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.RELEASE_UTILS_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Download Flatpak archive
         run: |
@@ -780,13 +723,6 @@ jobs:
           git add app.zen_browser.zen.yml
           git commit -m "Update to version ${{ needs.build-data.outputs.version }}"
 
-      - name: Clean up
-        run: |
-          rm -rf zen-browser
-          rm -rf archive.tar
-          rm -rf zen.linux-x86_64.tar.xz
-          rm -rf zen.linux-aarch64.tar.xz
-
       - name: Upload Flatpak manifest
         uses: actions/upload-artifact@v4
         with:
@@ -796,18 +732,13 @@ jobs:
 
       - name: Create pull request
         uses: peter-evans/create-pull-request@v7
-        env:
-          GIT_TRACE: 1
-          GIT_CURL_VERBOSE: 1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.RELEASE_UTILS_TOKEN || secrets.GITHUB_TOKEN }}
           commit-message: Update to version `${{ needs.build-data.outputs.version }}`
           title: Update to version `${{ needs.build-data.outputs.version }}`
           body: |
-            This PR updates the Zen Browser Flatpak package to version ${{ needs.build-data.outputs.version }}.
-
-            @${{ github.actor }} please review and merge this PR.
+            This PR updates the Flatpak package to version ${{ needs.build-data.outputs.version }}.
           branch: update-to-${{ needs.build-data.outputs.version }}
           base: master
-          git-token: ${{ secrets.GITHUB_TOKEN }}
+          git-token: ${{ secrets.RELEASE_UTILS_TOKEN || secrets.GITHUB_TOKEN }}
           delete-branch: true

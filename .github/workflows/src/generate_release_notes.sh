@@ -5,15 +5,16 @@ if [ "$RELEASE_BRANCH" = "release" ]; then
   RELEASE_TYPE="Stable"
 
   echo "Fetching release notes from GitHub..."
-  RELEASE_NOTES_JSON=$(curl -s --retry 5 --retry-delay 5 "$RELEASE_NOTES_URL")
+  RELEASE_NOTES_JSON=$(curl -s --retry 3 --retry-delay 2 "$RELEASE_NOTES_URL" || true)
 
-  if [ -z "$RELEASE_NOTES_JSON" ]; then
-    echo "Error: Failed to fetch release notes from GitHub"
-    exit 1
+  if [ -n "$RELEASE_NOTES_JSON" ] && echo "$RELEASE_NOTES_JSON" | jq . > /dev/null 2>&1; then
+    LATEST_RELEASE=$(echo "$RELEASE_NOTES_JSON" | jq -r 'last')
+    EXTRA_NOTES=$(echo "$LATEST_RELEASE" | jq -r '.extra // ""')
+  else
+    echo "Warning: Could not fetch structured release notes from $RELEASE_NOTES_URL. Using default notes."
+    LATEST_RELEASE="{}"
+    EXTRA_NOTES="Automated release build."
   fi
-
-  LATEST_RELEASE=$(echo "$RELEASE_NOTES_JSON" | jq -r 'last')
-  EXTRA_NOTES=$(echo "$LATEST_RELEASE" | jq -r '.extra // ""')
 else
   RELEASE_TYPE="Twilight"
 fi

@@ -14,7 +14,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -47,7 +47,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HIDE_AUTHOR: true
           HIDE_TIME_TO_ANSWER: true
-          SEARCH_QUERY: "repo:zen-browser/desktop is:issue created:${{ env.last_month }}"
+          SEARCH_QUERY: "repo:${{ github.repository }} is:issue created:${{ env.last_month }}"
 
       - name: Move metrics to docs folder
         run: |
@@ -55,7 +55,7 @@ jobs:
           rm -f docs/issue-metrics/${{ env.last_month_year }}_${{ env.last_month }}.md
           mv issue_metrics.md docs/issue-metrics/${{ env.last_month_year }}_${{ env.last_month }}.md
 
-      - name: Remove metrisc JSON
+      - name: Remove metrics JSON
         run: |
           rm -f issue_metrics.json
 
@@ -63,5 +63,5 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "docs: Update monthly issue metrics, b=(no bug), c={docs}"
-          commit_user_name: Zen Browser Robot
-          commit_user_email: zen-browser-auto@users.noreply.github.com
+          commit_user_name: github-actions[bot]
+          commit_user_email: github-actions[bot]@users.noreply.github.com

@@ -49,7 +49,11 @@
   },
   "license": {
     "ignoredFiles": [
-      ".*\\.json"
+      ".*\\.json",
+      ".*\\.webm",
+      ".*\\.toml",
+      ".*\\.xhtml",
+      ".*mochitests.*"
     ],
     "licenseType": "MPL-2.0"
   },

@@ -15,7 +15,7 @@ on:
 jobs:
   mac-build:
     name: Unify macOS (Universal)
-    runs-on: "macos-26"
+    runs-on: macos-14
 
     strategy:
       fail-fast: false
@@ -157,6 +157,9 @@ jobs:
           cd ../..
 
       - name: create .p12 for codesign 🖊️
+        if: ${{ env.HAVE_APP_CERT == 'true' }}
+        env:
+          HAVE_APP_CERT: ${{ secrets.macOS_CERTIFICATES_P12_For_App_BASE64 != '' }}
         run: |
           cd engine
           echo "${{ secrets.macOS_CERTIFICATES_P12_For_App_BASE64 }}" > cert.txt
@@ -164,10 +167,16 @@ jobs:
           echo "${{ secrets.macOS_CERTIFICATES_P12_PASSWORD }}" > zenpCertPassword.passwd
 
       - name: Remove certificate sensitive information
+        if: ${{ env.HAVE_APP_CERT == 'true' }}
+        env:
+          HAVE_APP_CERT: ${{ secrets.macOS_CERTIFICATES_P12_For_App_BASE64 != '' }}
         run: |
-          rm engine/cert.txt || true
+          rm -f engine/cert.txt || true
 
       - name: Import provisioning profile for .app
+        if: ${{ env.HAVE_PROV == 'true' }}
+        env:
+          HAVE_PROV: ${{ secrets.macOS_PROVISIONING_PROFILE != '' }}
         run: |
           echo "${{ secrets.macOS_PROVISIONING_PROFILE }}" | base64 --decode > ./engine/Zen_Browser.provisionprofile
           ls -la
@@ -176,15 +185,21 @@ jobs:
         run: |
           cd engine
           ./mach python "./toolkit/mozapps/installer/unify.py" "./obj-x86_64-apple-darwin/dist/${{ env.APP_NAME }}.app" "./obj-aarch64-apple-darwin/dist/${{ env.APP_NAME }}.app"
-          echo "Merged aaarch64 into x86_64!"
+          echo "Merged aarch64 into x86_64!"
 
       - name: Import APPLE DEVELOPER ID CERTIFICATE for .app
+        if: ${{ env.HAVE_APP_CERT == 'true' }}
+        env:
+          HAVE_APP_CERT: ${{ secrets.macOS_CERTIFICATES_P12_For_App_BASE64 != '' }}
         uses: Apple-Actions/import-codesign-certs@v3
         with:
           p12-file-base64: ${{ secrets.macOS_CERTIFICATES_P12_For_App_BASE64 }}
           p12-password: ${{ secrets.macOS_CERTIFICATES_P12_PASSWORD }}
 
       - name: Copy provisioning profile for .app (embedded in .app)
+        if: ${{ env.HAVE_PROV == 'true' }}
+        env:
+          HAVE_PROV: ${{ secrets.macOS_PROVISIONING_PROFILE != '' }}
         run: |
           cd engine
           echo "Copying provisioning profile for .app on both architectures (${{ env.APP_NAME }})"
@@ -193,8 +208,12 @@ jobs:
       - name: Sign .app
         run: |
           cd engine
-          # TODO: Change it to "production" once we figure out the issue with the webauth
-          ./mach macos-sign -v -r -c "release" -e "production" -a "./obj-x86_64-apple-darwin/dist/${{ env.APP_NAME }}.app" --rcodesign-p12-file zenCert.p12 --rcodesign-p12-password-file zenpCertPassword.passwd
+          if [ -n "${{ secrets.macOS_CERTIFICATES_P12_For_App_BASE64 }}" ]; then
+            ./mach macos-sign -v -r -c "release" -e "production" -a "./obj-x86_64-apple-darwin/dist/${{ env.APP_NAME }}.app" --rcodesign-p12-file zenCert.p12 --rcodesign-p12-password-file zenpCertPassword.passwd
+          else
+            echo "Skipping .app signing: macOS certificate secret not set. Ad-hoc signing binary."
+            codesign --force --deep --sign - "./obj-x86_64-apple-darwin/dist/${{ env.APP_NAME }}.app" || true
+          fi
 
       - name: Create DMG
         run: |
@@ -214,14 +233,18 @@ jobs:
         run: |
           set -ex
           hdiutil convert zen-macOS-universal-temp.dmg -format UDZO -imagekey zlib-level=9 -o zen.macos-universal.dmg
-          codesign -s "${{ secrets.macOS_AppleDeveloperId }}" zen.macos-universal.dmg
-          xcrun notarytool submit "zen.macos-universal.dmg" \
-            --apple-id "${{ secrets.macOS_AppleAccountId }}" \
-            --team-id "${{ secrets.macOS_AppleDeveloperIdTeamId }}" \
-            --password "${{ secrets.macOS_AppleDeveloperIdPassword }}" \
-            --no-s3-acceleration \
-            --wait
-          xcrun stapler staple "zen.macos-universal.dmg"
+          if [ -n "${{ secrets.macOS_AppleDeveloperId }}" ] && [ -n "${{ secrets.macOS_AppleDeveloperIdPassword }}" ]; then
+            codesign -s "${{ secrets.macOS_AppleDeveloperId }}" zen.macos-universal.dmg
+            xcrun notarytool submit "zen.macos-universal.dmg" \
+              --apple-id "${{ secrets.macOS_AppleAccountId }}" \
+              --team-id "${{ secrets.macOS_AppleDeveloperIdTeamId }}" \
+              --password "${{ secrets.macOS_AppleDeveloperIdPassword }}" \
+              --no-s3-acceleration \
+              --wait
+            xcrun stapler staple "zen.macos-universal.dmg"
+          else
+            echo "Skipping DMG notarization: Apple Developer ID not configured."
+          fi
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4

@@ -1,3 +1,6 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 const EMPTY_PAGE_URL = GetTestWebBasedURL("file_empty.html");
 const AUTPLAY_PAGE_URL = GetTestWebBasedURL("file_autoplay_media.html");
 const CORS_AUTPLAY_PAGE_URL = GetTestWebBasedURL(

@@ -26,7 +26,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Check if upstream branch already exists
         id: check-upstream-branch
@@ -62,7 +62,7 @@ jobs:
 
       - name: Restore Surfer engine cache
         id: surfer-engine-cache
-        uses: actions/cache@v5
+        uses: actions/cache@v4
         with:
           path: .surfer/engine/
           key: surfer-engine-${{ hashFiles('surfer.json') }}

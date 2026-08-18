@@ -1,3 +1,6 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 const DG_BACKGROUND = "/desktop/gnome/background";
 const DG_IMAGE_KEY = DG_BACKGROUND + "/picture_filename";
 const DG_OPTION_KEY = DG_BACKGROUND + "/picture_options";

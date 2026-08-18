@@ -34,8 +34,7 @@ on:
 jobs:
   windows-build:
     name: Build Windows - ${{ matrix.arch }}
-    # aarch64 does not need full 16x, and we also dont use full LTO when generating GPO
-    runs-on: ${{ (inputs.release-branch == 'release' && !inputs.generate-pgo && matrix.arch == 'x86_64') && 'self-hosted' || 'blacksmith-8vcpu-ubuntu-2404' }}
+    runs-on: ubuntu-24.04
     env:
       SCCACHE_GHA_ENABLED: ${{ inputs.use-sccache && 'true' || 'false' }}
       CARGO_TERM_COLOR: always
@@ -47,7 +46,7 @@ jobs:
 
     steps:
       - name: Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@main
+        uses: jlumbroso/free-disk-space@v1.3.1
         if: ${{ !(inputs.generate-pgo && matrix.arch == 'aarch64') }}
         with:
           tool-cache: false
@@ -59,18 +58,18 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
-        uses: useblacksmith/setup-node@v5
+        uses: actions/setup-node@v4
         with:
           node-version-file: ".nvmrc"
 
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@main
+        uses: mozilla-actions/sccache-action@v0.0.8
         if: ${{ inputs.use-sccache }}
         with:
           disable_annotations: true
 
       - name: Expose actions cache variables
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
           script: |
             core.exportVariable('ACTIONS_CACHE_URL', process.env['ACTIONS_CACHE_URL'])
@@ -98,7 +97,7 @@ jobs:
         env:
           SEGMENT_DOWNLOAD_TIMEOUT_MINS: 5
         id: cache-win-cross
-        uses: useblacksmith/cache@v5
+        uses: actions/cache@v4
         with:
           path: ${HOME}/win-cross
           key: win-cross
