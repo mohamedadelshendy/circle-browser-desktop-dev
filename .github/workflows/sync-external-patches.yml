@@ -67,7 +67,7 @@ jobs:
           GIT_TRACE: 1
           GIT_CURL_VERBOSE: 1
         with:
-          token: ${{ secrets.DEPLOY_KEY }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "chore: Sync external patches"
           branch: "chore/sync-external-patches-${{ github.run_id }}"
           title: "Sync external patches"
@@ -78,5 +78,5 @@ jobs:
 
             @${{ github.actor }} please review and merge this PR. Generated from workflow run [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}), branch ${{ github.head_ref }}.
           base: dev
-          git-token: ${{ secrets.DEPLOY_KEY }}
+          git-token: ${{ secrets.GITHUB_TOKEN }}
           delete-branch: true
