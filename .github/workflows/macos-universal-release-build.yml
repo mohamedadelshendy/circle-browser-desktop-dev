@@ -156,24 +156,21 @@ jobs:
           find . -maxdepth 1 -name "*.app" -type d
           cd ../..
 
-      - name: create .p12 for codesign 🖊️
-        if: ${{ secrets.macOS_CERTIFICATES_P12_For_App_BASE64 != '' }}
+      - name: Setup codesign certificates and profile
+        env:
+          CERT_B64: ${{ secrets.macOS_CERTIFICATES_P12_For_App_BASE64 }}
+          CERT_PASS: ${{ secrets.macOS_CERTIFICATES_P12_PASSWORD }}
+          PROV_B64: ${{ secrets.macOS_PROVISIONING_PROFILE }}
         run: |
           cd engine
-          echo "${{ secrets.macOS_CERTIFICATES_P12_For_App_BASE64 }}" > cert.txt
-          base64 --decode -i cert.txt -o zenCert.p12
-          echo "${{ secrets.macOS_CERTIFICATES_P12_PASSWORD }}" > zenpCertPassword.passwd
-
-      - name: Remove certificate sensitive information
-        if: ${{ secrets.macOS_CERTIFICATES_P12_For_App_BASE64 != '' }}
-        run: |
-          rm -f engine/cert.txt || true
-
-      - name: Import provisioning profile for .app
-        if: ${{ secrets.macOS_PROVISIONING_PROFILE != '' }}
-        run: |
-          echo "${{ secrets.macOS_PROVISIONING_PROFILE }}" | base64 --decode > ./engine/Zen_Browser.provisionprofile
-          ls -la
+          if [ -n "$CERT_B64" ]; then
+            echo "$CERT_B64" | base64 --decode > zenCert.p12
+            echo "$CERT_PASS" > zenpCertPassword.passwd
+          fi
+          if [ -n "$PROV_B64" ]; then
+            echo "$PROV_B64" | base64 --decode > Zen_Browser.provisionprofile
+            cp Zen_Browser.provisionprofile embedded.provisionprofile
+          fi
 
       - name: Unify architectures
         run: |
@@ -181,24 +178,12 @@ jobs:
           ./mach python "./toolkit/mozapps/installer/unify.py" "./obj-x86_64-apple-darwin/dist/${{ env.APP_NAME }}.app" "./obj-aarch64-apple-darwin/dist/${{ env.APP_NAME }}.app"
           echo "Merged aarch64 into x86_64!"
 
-      - name: Import APPLE DEVELOPER ID CERTIFICATE for .app
-        if: ${{ secrets.macOS_CERTIFICATES_P12_For_App_BASE64 != '' }}
-        uses: Apple-Actions/import-codesign-certs@v3
-        with:
-          p12-file-base64: ${{ secrets.macOS_CERTIFICATES_P12_For_App_BASE64 }}
-          p12-password: ${{ secrets.macOS_CERTIFICATES_P12_PASSWORD }}
-
-      - name: Copy provisioning profile for .app (embedded in .app)
-        if: ${{ secrets.macOS_PROVISIONING_PROFILE != '' }}
-        run: |
-          cd engine
-          echo "Copying provisioning profile for .app on both architectures (${{ env.APP_NAME }})"
-          cp ./Zen_Browser.provisionprofile "./embedded.provisionprofile"
-
       - name: Sign .app
+        env:
+          CERT_B64: ${{ secrets.macOS_CERTIFICATES_P12_For_App_BASE64 }}
         run: |
           cd engine
-          if [ -n "${{ secrets.macOS_CERTIFICATES_P12_For_App_BASE64 }}" ]; then
+          if [ -n "$CERT_B64" ] && [ -f "zenCert.p12" ]; then
             ./mach macos-sign -v -r -c "release" -e "production" -a "./obj-x86_64-apple-darwin/dist/${{ env.APP_NAME }}.app" --rcodesign-p12-file zenCert.p12 --rcodesign-p12-password-file zenpCertPassword.passwd
           else
             echo "Skipping .app signing: macOS certificate secret not set. Ad-hoc signing binary."
