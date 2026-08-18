@@ -254,7 +254,9 @@ jobs:
         run: npm run surfer -- ci --brand ${{ inputs.update_branch }} --display-version ${{ needs.build-data.outputs.version }}
 
       - name: Download Firefox source and dependencies
-        run: npm run download --verbose
+        run: |
+          npx surfer update --frozen || true
+          npx surfer download --version 153.0.4 || npm run download --verbose
 
       - name: Import
         run: npm run import -- --verbose
